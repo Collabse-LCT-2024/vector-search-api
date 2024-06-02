@@ -4,12 +4,14 @@ from fastapi import FastAPI
 from dotenv import load_dotenv
 from clip_client import Client
 from models import TextEmbedding, Vector
+import translators as ts
 
 load_dotenv(override=True)
 WEAVIATE_HOST = os.environ.get("WEAVIATE_HOST")
 CLIP_URL = os.environ.get("CLIP_URL")
 
 app = FastAPI()
+_ = ts.preaccelerate_and_speedtest()  # speed up translation.
 client = DataBaseClient(WEAVIATE_HOST, "EmbeddingsIndex")
 clip_client = Client(CLIP_URL)
 
@@ -48,7 +50,14 @@ def search_by_vector(
 def search_by_text(
     text: str, top_k: int = 3, include_vector: bool = False
 ) -> list[Vector]:
-    text_embedding = clip_client.encode([text])[0]
+    eng_text = ts.translate_text(
+        query_text=text,
+        translator="yandex",
+        from_language="ru",
+        to_language="en",
+        if_use_preacceleration=True,
+    )
+    text_embedding = clip_client.encode([eng_text])[0]
     response = client.search(text_embedding.tolist(), top_k)
     result = []
     for o in response.objects:

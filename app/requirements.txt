@@ -4,3 +4,4 @@ weaviate-client
 python-dotenv
 clip-client
 docarray==0.21.0
+translators
