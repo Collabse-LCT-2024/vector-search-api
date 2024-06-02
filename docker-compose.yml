@@ -1,0 +1,6 @@
+services:
+  vector-search:
+    container_name: vector-search
+    build: ./app
+    ports:
+      - 80:80
