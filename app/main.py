@@ -81,5 +81,12 @@ def search_by_text(
 
 @app.get("/encode_text")
 def encode_text(text: str) -> TextEmbedding:
-    text_embedding = clip_client.encode([text])[0]
+    eng_text = ts.translate_text(
+        query_text=text,
+        translator="yandex",
+        from_language="ru",
+        to_language="en",
+        if_use_preacceleration=True,
+    )
+    text_embedding = clip_client.encode([eng_text])[0]
     return TextEmbedding(vector=text_embedding)
