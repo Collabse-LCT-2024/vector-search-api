@@ -44,9 +44,30 @@ def search_by_vector(
     return result
 
 
-@app.get("/items/is_present_by_id")
-def is_present_by_id(unified_id: str) -> bool:
-    return client.is_present_by_id(unified_id)
+@app.post("/items/search_by_text")
+def search_by_text(
+    text: str, top_k: int = 3, include_vector: bool = False
+) -> list[Vector]:
+    text_embedding = clip_client.encode([text])[0]
+    response = client.search(text_embedding.tolist(), top_k)
+    result = []
+    for o in response.objects:
+        if not include_vector:
+            result.append(
+                Vector(
+                    external_id=o.properties["external_id"],
+                    link=o.properties["link"],
+                )
+            )
+        else:
+            result.append(
+                Vector(
+                    external_id=o.properties["external_id"],
+                    link=o.properties["link"],
+                    vector=o.vector,
+                )
+            )
+    return result
 
 
 @app.get("/encode_text")
