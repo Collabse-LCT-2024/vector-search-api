@@ -4,7 +4,8 @@ from pydantic import BaseModel
 class Vector(BaseModel):
     external_id: str
     link: str
-    vector: list[float] = None
+    similar_frame_count: int
+    max_distance: float
 
 
 class TextEmbedding(BaseModel):

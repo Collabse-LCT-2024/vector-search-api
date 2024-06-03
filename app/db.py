@@ -2,6 +2,7 @@ import weaviate.classes as wvc
 from weaviate.classes.query import Filter
 from weaviate.classes.config import Property, DataType
 import weaviate
+from weaviate.classes.query import MetadataQuery, GroupBy
 
 
 class DataBaseClient:
@@ -18,9 +19,15 @@ class DataBaseClient:
         self.collection = self.weaviate_client.collections.get(self.index_name)
 
     def search(self, query_vector, top_k):
+        group_by = GroupBy(
+            prop="external_id",  # group by this property
+            objects_per_group=1800,
+            number_of_groups=top_k,  # maximum number of groups
+        )
         response = self.collection.query.near_vector(
             near_vector=query_vector,
-            limit=top_k,
+            group_by=group_by,
+            limit=1000,
             return_metadata=wvc.query.MetadataQuery(certainty=True),
         )
         return response
