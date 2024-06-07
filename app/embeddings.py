@@ -4,7 +4,6 @@ from transformers import AutoTokenizer, AutoModel
 tokenizer = AutoTokenizer.from_pretrained("cointegrated/rubert-tiny2")
 model = AutoModel.from_pretrained("cointegrated/rubert-tiny2")
 # model.cuda()  # uncomment it if you have a GPU
-model = torch.compile(model)
 
 
 def embed_bert_cls(text, model=model, tokenizer=tokenizer):
