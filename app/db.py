@@ -75,8 +75,11 @@ class DataBaseClient:
 
     def fetch_all(self, index_name, include_vector: bool = False):
         self.collection = self.weaviate_client.collections.get(index_name)
+        items = []
         for item in self.collection.iterator(include_vector=include_vector):
-            print(item)
+            count += 1
+            items.append(item.properties["external_id"])
+        return (count), (len(set(items)))
 
     def is_present_by_id(self, index_name, equal_to, by_property: str):
         self.collection = self.weaviate_client.collections.get(index_name)

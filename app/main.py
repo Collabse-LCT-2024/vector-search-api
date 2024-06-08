@@ -4,7 +4,6 @@ from db import DataBaseClient
 from fastapi import FastAPI
 from dotenv import load_dotenv
 from clip_client import Client
-import translators as ts
 from pymongo import MongoClient
 
 load_dotenv(override=True)
@@ -14,7 +13,6 @@ MONOGO_URI = os.environ.get("MONGO_URI")
 
 app = FastAPI(root_path="/api/v1")
 print("PREACCELERATING TRANSLATION. MAY TAKE UP TO 5 MINUTES")
-# _ = ts.preaccelerate_and_speedtest(timeout=10)  # speed up translation.
 client = DataBaseClient(WEAVIATE_HOST)
 mongo = MongoClient(MONOGO_URI)
 clip_client = Client(CLIP_URL)
@@ -30,13 +28,6 @@ def read_root():
 
 @app.post("/search/text")
 def search_by_text(text: str, mode: int, top_k: int = 3):
-    # eng_text = ts.translate_text(
-    #     query_text=text,
-    #     translator="yandex",
-    #     from_language="ru",
-    #     to_language="en",
-    #     if_use_preacceleration=True,
-    # )
     eng_text = text
     query_vector = clip_client.encode([eng_text])[0].tolist()
     if mode == 0:
@@ -50,7 +41,12 @@ def search_by_text(text: str, mode: int, top_k: int = 3):
     if mode == 3:
         query_vector = embed_bert_cls(eng_text).tolist()
         response = client.search("LLMEmbeddings", query_vector, top_k)
-
+    if mode == 4:
+        query_vector = embed_bert_cls(eng_text).tolist()
+        response = client.search("WhisperFullEmbeddings", query_vector, top_k)
+    if mode == 5:
+        query_vector = embed_bert_cls(eng_text).tolist()
+        response = client.search("WhisperSumEmbeddings", query_vector, top_k)
     result = []
     if mode == 0:
         for k, group in response.groups.items():
@@ -66,7 +62,7 @@ def search_by_text(text: str, mode: int, top_k: int = 3):
                     "relevant_frames_count": relevant_frames_count,
                 }
             )
-    elif mode == 1 or mode == 2 or mode == 3:
+    elif mode == 1 or mode == 2 or mode == 3 or mode == 4 or mode == 5:
         for obj in response.objects:
             external_id = obj.properties["external_id"]
             link = collection.find_one({"uuid": external_id})["link"]
