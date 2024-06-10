@@ -1,3 +1,4 @@
+import time
 from typing import List
 import weaviate.classes as wvc
 from weaviate.classes.query import Filter
@@ -46,17 +47,49 @@ class DataBaseClient:
             near_vector=query_vector,
             group_by=group_by,
             limit=1000,
+            include_vector=True,
             return_metadata=wvc.query.MetadataQuery(certainty=True),
         )
         print("SEARCHING")
         return response
 
-    def search(self, index_name, query_vector, top_k):
+    def experimental_groupby(self, query_vector, top_k, db1, db2):
+        t0 = time.time()
+        res1 = self.search(db1, query_vector, 100).objects
+        t1 = time.time()
+        print("db1 request", t1 - t0)
+        t0 = time.time()
+        res2 = self.search(db2, query_vector, 100).objects
+        t1 = time.time()
+        print("db2 request", t1 - t0)
+        grouped_results = []
+        for res in res1:
+            grouped_results.append(
+                {
+                    "external_id": res.properties["external_id"],
+                    "link": res.properties["link"],
+                    "distance": res.metadata.distance,
+                    "from": db1,
+                }
+            )
+        for res in res2:
+            grouped_results.append(
+                {
+                    "external_id": res.properties["external_id"],
+                    "link": res.properties["link"],
+                    "distance": res.metadata.distance,
+                    "from": db2,
+                }
+            )
+        return sorted(grouped_results, key=lambda x: x["distance"])[:top_k]
+
+    def search(self, index_name, query_vector, top_k, include_vector: bool = False):
         self.collection = self.weaviate_client.collections.get(index_name)
         response = self.collection.query.near_vector(
             near_vector=query_vector,
             limit=top_k,
-            return_metadata=wvc.query.MetadataQuery(certainty=True),
+            include_vector=include_vector,
+            return_metadata=wvc.query.MetadataQuery(distance=True, certainty=True),
         )
         return response
 
@@ -75,6 +108,7 @@ class DataBaseClient:
 
     def fetch_all(self, index_name, include_vector: bool = False):
         self.collection = self.weaviate_client.collections.get(index_name)
+        count = 0
         items = []
         for item in self.collection.iterator(include_vector=include_vector):
             count += 1
