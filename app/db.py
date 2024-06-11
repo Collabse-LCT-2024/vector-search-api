@@ -53,7 +53,7 @@ class DataBaseClient:
         print("SEARCHING")
         return response
 
-    def experimental_groupby(self, query_vector, top_k, db1, db2):
+    def experimental_groupby(self, query_vector, top_k, db1, db2, db3):
         t0 = time.time()
         res1 = self.search(db1, query_vector, 100).objects
         t1 = time.time()
@@ -62,6 +62,7 @@ class DataBaseClient:
         res2 = self.search(db2, query_vector, 100).objects
         t1 = time.time()
         print("db2 request", t1 - t0)
+        res3 = self.search(db3, query_vector, 100).objects
         grouped_results = []
         for res in res1:
             grouped_results.append(
@@ -79,6 +80,15 @@ class DataBaseClient:
                     "link": res.properties["link"],
                     "distance": res.metadata.distance,
                     "from": db2,
+                }
+            )
+        for res in res3:
+            grouped_results.append(
+                {
+                    "external_id": res.properties["external_id"],
+                    "link": res.properties["link"],
+                    "distance": res.metadata.distance,
+                    "from": db3,
                 }
             )
         return sorted(grouped_results, key=lambda x: x["distance"])[:top_k]

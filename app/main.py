@@ -31,6 +31,7 @@ def search_by_text(
     group_by: bool = False,
     groub_db1: str = "",
     groub_db2: str = "",
+    group_db3: str = "",
 ):
 
     if not group_by:
@@ -40,7 +41,7 @@ def search_by_text(
         result = []
         for obj in response.objects:
             external_id = obj.properties["external_id"]
-            link = collection.find_one({"uuid": external_id})["link"]
+            link = obj.properties["link"]
             vector = obj.vector
             result.append({"external_id": external_id, "link": link})
         return result
@@ -48,6 +49,6 @@ def search_by_text(
         eng_text = text
         query_vector = embed_labse(eng_text).tolist()
         response = client.experimental_groupby(
-            query_vector, top_k, groub_db1, groub_db2
+            query_vector, top_k, groub_db1, groub_db2, group_db3
         )
         return response
