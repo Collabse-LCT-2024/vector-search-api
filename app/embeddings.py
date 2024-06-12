@@ -11,15 +11,6 @@ l_model = AutoModel.from_pretrained("cointegrated/LaBSE-en-ru")
 l_model.eval()
 
 
-def embed_bert_cls(text, model=model, tokenizer=tokenizer):
-    t = tokenizer(text, padding=True, truncation=True, return_tensors="pt")
-    with torch.no_grad():
-        model_output = model(**{k: v.to(model.device) for k, v in t.items()})
-    embeddings = model_output.last_hidden_state[:, 0, :]
-    embeddings = torch.nn.functional.normalize(embeddings)
-    return embeddings[0].cpu().numpy()
-
-
 def embed_labse(text):
     t0 = time.time()
     encoded_input = l_tokenizer(

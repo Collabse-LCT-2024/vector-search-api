@@ -7,7 +7,6 @@ from pymongo import MongoClient
 
 load_dotenv(override=True)
 WEAVIATE_HOST = os.environ.get("WEAVIATE_HOST")
-CLIP_URL = os.environ.get("CLIP_URL")
 MONOGO_URI = os.environ.get("MONGO_URI")
 
 app = FastAPI(root_path="/api/v1")
@@ -42,7 +41,6 @@ def search_by_text(
         for obj in response.objects:
             external_id = obj.properties["external_id"]
             link = obj.properties["link"]
-            vector = obj.vector
             result.append({"external_id": external_id, "link": link})
         return result
     else:
