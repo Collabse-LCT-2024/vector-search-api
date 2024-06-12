@@ -1,17 +1,15 @@
-# 
-FROM python:3.9
+# Стадия сборки
+FROM pytorch/pytorch:latest AS build
 
-# 
-WORKDIR /code
+WORKDIR /app
 
-# 
-COPY ./requirements.txt /code/requirements.txt
+# Копируем и устанавливаем зависимости
+COPY requirements.txt .
+RUN pip install -r requirements.txt
 
-# 
-RUN pip install -r /code/requirements.txt --use-deprecated=legacy-resolver
+# Копируем остальные файлы приложения
+COPY . .
 
-# 
-COPY . /code/app
+# Команда для запуска приложения
+CMD ["fastapi", "run", "main.py", "--port", "80"]
 
-# 
-CMD ["fastapi", "run", "app/main.py", "--port", "80"]
