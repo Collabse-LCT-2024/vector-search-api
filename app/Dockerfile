@@ -1,5 +1,5 @@
 # Стадия сборки
-FROM pytorch/pytorch:latest AS build
+FROM python:3.9 AS build
 
 WORKDIR /app
 

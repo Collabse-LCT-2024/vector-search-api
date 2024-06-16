@@ -1,134 +1,99 @@
-import time
 from typing import List
-import weaviate.classes as wvc
-from weaviate.classes.query import Filter
-from weaviate.classes.config import Property
-import weaviate
-from weaviate.classes.query import GroupBy
+from qdrant_client import QdrantClient
+from qdrant_client.http import models
+
+from logger import Logger
 
 
-class DataBaseClient:
-    def __init__(self, WEAVIATE_HOST):
-        self.weaviate_client = weaviate.connect_to_custom(
-            http_host=WEAVIATE_HOST,
-            http_port=8080,
-            http_secure=False,
-            grpc_host=WEAVIATE_HOST,
-            grpc_port=50051,
-            grpc_secure=False,
+class QdrantDBClient:
+    def __init__(self, QDRANT_HOST):
+        self.qdrant_client = QdrantClient(
+            host=QDRANT_HOST, port=6333, grpc_port=6334, prefer_grpc=True
         )
+        self.logger = Logger().get_logger()
 
-    def save_batch_embeddings(self, index_name, embeddings, properties: List[dict]):
-        self.collection = self.weaviate_client.collections.get(index_name)
-        question_objs = []
-        for i, item in enumerate(embeddings):
-            question_objs.append(
-                wvc.data.DataObject(
-                    properties=properties[i],
-                    vector=item,
-                )
-            )
-        self.collection.data.insert_many(question_objs)
-        print("saved batch")
-
-    def save_embedding(self, index_name, embedding, properties: dict):
-        self.collection = self.weaviate_client.collections.get(index_name)
-        self.collection.data.insert(properties=properties, vector=embedding)
-        print("saved embedding")
-
-    def search_group_by(self, index_name, query_vector, top_k, group_property):
-        self.collection = self.weaviate_client.collections.get(index_name)
-        group_by = GroupBy(
-            prop=group_property,  # group by this property
-            objects_per_group=1800,
-            number_of_groups=top_k,  # maximum number of groups
-        )
-        response = self.collection.query.near_vector(
-            near_vector=query_vector,
-            group_by=group_by,
-            limit=1000,
-            include_vector=True,
-            return_metadata=wvc.query.MetadataQuery(certainty=True),
-        )
-        print("SEARCHING")
-        return response
-
-    def experimental_groupby(self, query_vector, top_k, db1, db2, db3):
-        t0 = time.time()
-        res1 = self.search(db1, query_vector, 100).objects
-        t1 = time.time()
-        print("db1 request", t1 - t0)
-        t0 = time.time()
-        res2 = self.search(db2, query_vector, 100).objects
-        t1 = time.time()
-        print("db2 request", t1 - t0)
-        res3 = self.search(db3, query_vector, 100).objects
-        grouped_results = []
-        for res in res1:
-            grouped_results.append(
-                {
-                    "external_id": res.properties["external_id"],
-                    "link": res.properties["link"],
-                    "distance": res.metadata.distance,
-                    "from": db1,
-                }
-            )
-        for res in res2:
-            grouped_results.append(
-                {
-                    "external_id": res.properties["external_id"],
-                    "link": res.properties["link"],
-                    "distance": res.metadata.distance,
-                    "from": db2,
-                }
-            )
-        for res in res3:
-            grouped_results.append(
-                {
-                    "external_id": res.properties["external_id"],
-                    "link": res.properties["link"],
-                    "distance": res.metadata.distance,
-                    "from": db3,
-                }
-            )
-        return sorted(grouped_results, key=lambda x: x["distance"])[:top_k]
-
-    def search(self, index_name, query_vector, top_k, include_vector: bool = False):
-        self.collection = self.weaviate_client.collections.get(index_name)
-        response = self.collection.query.near_vector(
-            near_vector=query_vector,
-            limit=top_k,
-            include_vector=include_vector,
-            return_metadata=wvc.query.MetadataQuery(distance=True, certainty=True),
-        )
-        return response
-
-    def drop_collection(self, index_name):
-        self.weaviate_client.collections.delete(index_name)
-
-    def create_collection(self, name: str, properties: List[Property]):
-        self.weaviate_client.collections.create(
-            name,
-            vectorizer_config=wvc.config.Configure.Vectorizer.none(),
-            vector_index_config=wvc.config.Configure.VectorIndex.hnsw(
-                distance_metric=wvc.config.VectorDistances.COSINE
+    def save_batch_embeddings(
+        self, collection_name, embeddings, properties: List[dict]
+    ):
+        self.qdrant_client.upsert(
+            collection_name=collection_name,
+            points=models.Batch(
+                ids=[prop["external_id"] for prop in properties],
+                vectors=embeddings,
+                payloads=properties,
             ),
-            properties=properties,
+        )
+        self.logger.info(f"Saved batch of embeddings {len(embeddings)} items")
+
+    def save_embedding(self, collection_name, embedding, properties: dict):
+        self.qdrant_client.upsert(
+            collection_name=collection_name,
+            points=[
+                models.PointStruct(
+                    id=properties["external_id"],
+                    vector=embedding,
+                    payload=properties,
+                )
+            ],
+        )
+        self.logger.info(f"Saved embedding {properties['external_id']}")
+
+    def search(self, collection_name, query_vector, top_k):
+        response = self.qdrant_client.search(
+            collection_name=collection_name,
+            query_vector=query_vector,
+            limit=top_k,
+        )
+        return response
+
+    def drop_collection(self, collection_name):
+        self.logger.info(f"Deleting collection {collection_name}")
+        self.qdrant_client.delete_collection(collection_name=collection_name)
+
+    def create_collection(self, collection_name, vector_size, delete_if_exists=False):
+        if self.qdrant_client.collection_exists(collection_name):
+            self.logger.info(f"Collection {collection_name} already exists")
+            if delete_if_exists:
+                self.logger.info(f"Deleting collection {collection_name}")
+                self.qdrant_client.delete_collection(collection_name)
+            else:
+                self.logger.info(f"Skipping collection {collection_name}")
+                return
+
+        self.logger.info(f"Creating collection {collection_name}")
+        self.qdrant_client.create_collection(
+            collection_name=collection_name,
+            vectors_config=models.VectorParams(
+                size=vector_size, distance=models.Distance.COSINE
+            ),
         )
 
-    def fetch_all(self, index_name, include_vector: bool = False):
-        self.collection = self.weaviate_client.collections.get(index_name)
-        count = 0
-        items = []
-        for item in self.collection.iterator(include_vector=include_vector):
-            count += 1
-            items.append(item.properties["external_id"])
-        return (count), (len(set(items)))
-
-    def is_present_by_id(self, index_name, equal_to, by_property: str):
-        self.collection = self.weaviate_client.collections.get(index_name)
-        response = self.collection.query.fetch_objects(
-            filters=Filter.by_property(by_property).equal(equal_to), limit=1000
+    def fetch_all(self, collection_name, include_vector: bool = False):
+        result = self.qdrant_client.scroll(
+            collection_name=collection_name,
+            with_vectors=include_vector,
+            with_payload=True,
         )
-        print(response.objects)
-        return len(response.objects) > 0
+        for item in result:
+            print(item)
+
+    def get_db_size(self, collection_names=None):
+        if collection_names is None:
+            collection_names = self.qdrant_client.get_collections().collections
+
+        for collection_name in collection_names:
+            count = self.qdrant_client.count(collection_name).count
+            print(f"{collection_name} size: {count}")
+
+    def is_present_by_id(self, collection_name, point_id):
+        objects = self.qdrant_client.retrieve(
+            collection_name=collection_name, ids=[point_id]
+        )
+        if objects:
+            return True
+        return False
+
+    def search_group_by(self, collection_name, query_vector, top_k, group_property):
+        # Qdrant не поддерживает группировку результатов напрямую,
+        # поэтому эта функция не может быть реализована без дополнительной обработки на стороне клиента.
+        raise NotImplementedError("search_group_by is not supported in Qdrant")

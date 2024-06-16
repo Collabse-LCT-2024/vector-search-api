@@ -1,6 +1,6 @@
 import os
 from embeddings import embed_labse
-from db import DataBaseClient
+from db import QdrantDBClient
 from fastapi import FastAPI
 from dotenv import load_dotenv
 from pymongo import MongoClient
@@ -10,7 +10,7 @@ WEAVIATE_HOST = os.environ.get("WEAVIATE_HOST")
 MONOGO_URI = os.environ.get("MONGO_URI")
 
 app = FastAPI(root_path="/api/v1")
-client = DataBaseClient(WEAVIATE_HOST)
+client = QdrantDBClient(WEAVIATE_HOST)
 mongo = MongoClient(MONOGO_URI)
 db = mongo["storage"]
 collection = db["videos"]
@@ -36,13 +36,7 @@ def search_by_text(
     if not group_by:
         eng_text = text
         query_vector = embed_labse(eng_text).tolist()
-        response = client.search(collection, query_vector, top_k)
-        result = []
-        for obj in response.objects:
-            external_id = obj.properties["external_id"]
-            link = obj.properties["link"]
-            result.append({"external_id": external_id, "link": link})
-        return result
+        return client.search(collection, query_vector, top_k)
     else:
         eng_text = text
         query_vector = embed_labse(eng_text).tolist()
