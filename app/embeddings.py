@@ -2,10 +2,6 @@ import time
 import torch
 from transformers import AutoTokenizer, AutoModel
 
-tokenizer = AutoTokenizer.from_pretrained("cointegrated/rubert-tiny2")
-model = AutoModel.from_pretrained("cointegrated/rubert-tiny2")
-# model.cuda()  # uncomment it if you have a GPU
-
 l_tokenizer = AutoTokenizer.from_pretrained("cointegrated/LaBSE-en-ru")
 l_model = AutoModel.from_pretrained("cointegrated/LaBSE-en-ru")
 l_model.eval()
